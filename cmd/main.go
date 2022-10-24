@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// create dynamodb instance w/ AWS session
-	dynaClient := dynamodb.New(awsSession)
+	dynaClient = dynamodb.New(awsSession)
 
 	// start aws lambda handler
 	lambda.Start(handler)
