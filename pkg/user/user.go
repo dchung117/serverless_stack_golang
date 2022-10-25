@@ -1,12 +1,15 @@
 package user
 
 import (
+	"encoding/json"
 	"errors"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb/"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/dchung117/serverless_stack_golang/pkg/validators"
 )
 
 // define user struct
@@ -20,6 +23,13 @@ type User struct {
 var (
 	ErrorFailedToFetchRecord     = "failed to fetch record."
 	ErrorFailedtoUnmarshalRecord = "failed to unmarshal record."
+	ErrorInvalidUserData         = "invalid user data."
+	ErrorInvalidEmail            = "invalid email."
+	ErrorFailedtoMarshalItem     = "failed to marshal item."
+	ErrorCouldNotDeleteItem      = "failed to delete item."
+	ErrorCouldNotDynamoPutItem   = "failed to dynamo put item."
+	ErrorUserAlreadyExists       = "user already exists."
+	ErrorUserDoesNotExist        = "user does not exist."
 )
 
 func FetchUser(email string, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*User, error) {
@@ -71,11 +81,47 @@ func FetchUsers(tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*[]User
 	return item, nil
 }
 
-func CreateUser() {
+func CreateUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*User, error) {
+	// create new user variable
+	var user User
 
+	// unmarshal user info from request body
+	if err := json.Unmarshal([]byte(req.Body), &user); err != nil {
+		return nil, errors.New(ErrorFailedtoUnmarshalRecord)
+	}
+
+	// validate the email
+	if !validators.IsEmailValid(user.Email) {
+		return nil, errors.New(ErrorInvalidEmail)
+	}
+
+	// check if user already exists
+	currentUser, _ := FetchUser(user.Email, tableName, dynaClient)
+	if (currentUser != nil) && (len(currentUser.Email) != 0) {
+		return nil, errors.New(ErrorUserAlreadyExists)
+	}
+
+	// marshal the result
+	avMap, err := dynamodbattribute.MarshalMap(user)
+	if err != nil {
+		return nil, errors.New(ErrorFailedtoMarshalItem)
+	}
+
+	// update database
+	input := &dynamodb.PutItemInput{
+		Item:      avMap,
+		TableName: aws.String(tableName),
+	}
+
+	_, err = dynaClient.PutItem(input)
+	if err != nil {
+		return nil, errors.New(ErrorCouldNotDynamoPutItem)
+	}
+
+	return &user, nil
 }
 
-func UpdateUser() {
+func UpdateUser() (User, error) {
 
 }
 

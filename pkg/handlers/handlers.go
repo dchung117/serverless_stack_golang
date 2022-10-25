@@ -41,16 +41,40 @@ func GetUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dyn
 	return apiResponse(http.StatusOK, result)
 }
 
-func CreateUser(req events.APIGatewayProxyRequest, tableName string, dynaCleint dynamodbiface.DynamoDBAPI) (*events.APIGatewayProxyResponse, error) {
+func CreateUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*events.APIGatewayProxyResponse, error) {
+	// get user info from request body
+	result, err := user.CreateUser(req, tableName, dynaClient)
+	if err != nil {
+		return apiResponse(http.StatusBadRequest, ErrorBody{
+			aws.String(err.Error()),
+		})
+	}
 
+	return apiResponse(http.StatusCreated, result)
 }
 
 func UpdateUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*events.APIGatewayProxyResponse, error) {
+	// update user info
+	result, err := user.UpdateUser(req, tableName, dynaClient)
+	if err != nil {
+		return apiResponse(http.StatusBadRequest, ErrorBody{
+			aws.String(err.Error()),
+		})
+	}
 
+	return apiResponse(http.StatusOK, result)
 }
 
 func DeleteUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*events.APIGatewayProxyResponse, error) {
+	// delete user
+	err := user.DeleteUser(req, tableName, dynaClient)
+	if err != nil {
+		return apiResponse(http.StatusBadRequest, ErrorBody{
+			aws.String(err.Error()),
+		})
+	}
 
+	return apiResponse(http.StatusOK, nil)
 }
 
 func UnhandledMethod() (*events.APIGatewayProxyResponse, error) {
