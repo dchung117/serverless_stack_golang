@@ -6,7 +6,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb/"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/dchung117/serverless_stack_golang/pkg/validators"
@@ -121,10 +121,64 @@ func CreateUser(req events.APIGatewayProxyRequest, tableName string, dynaClient 
 	return &user, nil
 }
 
-func UpdateUser() (User, error) {
+func UpdateUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) (*User, error) {
+	// create a new user
+	var user User
 
+	// unmarshal the request body
+	if err := json.Unmarshal([]byte(req.Body), &user); err != nil {
+		return nil, errors.New(ErrorFailedtoUnmarshalRecord)
+	}
+
+	// validate the email
+	if !validators.IsEmailValid(user.Email) {
+		return nil, errors.New(ErrorInvalidEmail)
+	}
+
+	// check if user exists
+	currentUser, _ := FetchUser(user.Email, tableName, dynaClient)
+	if currentUser != nil && len(currentUser.Email) == 0 {
+		return nil, errors.New(ErrorUserDoesNotExist)
+	}
+
+	// marshal the result
+	avMap, err := dynamodbattribute.MarshalMap(user)
+	if err != nil {
+		return nil, errors.New(ErrorFailedtoMarshalItem)
+	}
+
+	// update database
+	input := &dynamodb.PutItemInput{
+		Item:      avMap,
+		TableName: aws.String(tableName),
+	}
+
+	_, err = dynaClient.PutItem(input)
+	if err != nil {
+		return nil, errors.New(ErrorCouldNotDynamoPutItem)
+	}
+
+	return &user, nil
 }
 
-func DeleteUser() error {
+func DeleteUser(req events.APIGatewayProxyRequest, tableName string, dynaClient dynamodbiface.DynamoDBAPI) error {
+	// get email from query parameters
+	email := req.QueryStringParameters["email"]
 
+	// delete user w/ matching email
+	input := &dynamodb.DeleteItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"email": {
+				S: aws.String(email),
+			},
+		},
+		TableName: aws.String(tableName),
+	}
+
+	_, err := dynaClient.DeleteItem(input)
+	if err != nil {
+		return errors.New(ErrorCouldNotDeleteItem)
+	}
+
+	return nil
 }
