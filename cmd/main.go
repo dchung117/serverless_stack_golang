@@ -18,7 +18,7 @@ var (
 	dynaClient dynamodbiface.DynamoDBAPI
 )
 
-const tableName = "LambdaInGoUser"
+const tableName = "serverless_stack_golang"
 
 func main() {
 	// get AWS REGION from environment
